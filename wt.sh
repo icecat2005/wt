@@ -69,6 +69,19 @@ _wt_add() {
   esac
 }
 
+# Print the branch checked out in the worktree at "$1" (empty if it can't be
+# read). A detached HEAD reports as "HEAD", which we render as "detached@<sha>".
+# Note: the local is named `dir`, not `path` — in zsh `path` is tied to $PATH,
+# so `local path=...` would clobber PATH and make `git` unfindable.
+_wt_branch_of() {
+  local dir="$1" branch
+  branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+  if [[ "$branch" == 'HEAD' ]]; then
+    branch="detached@$(git -C "$dir" rev-parse --short HEAD 2>/dev/null)"
+  fi
+  printf '%s' "$branch"
+}
+
 # fzf-pick an existing worktree (or 'main') and act on it. "$1" is the mode:
 # 'cd' (default) or 'code'.
 _wt_switch() {
@@ -82,19 +95,29 @@ _wt_switch() {
     return 1
   fi
 
-  local selected_name selected_path
+  local dim=$'\033[2m' reset=$'\033[0m'
+  local selected_line selected_name selected_path
+  # Each row is "<name>\t<dim>branch<reset>": the branch is shown faded for
+  # context only. fzf searches just the name field (--nth=1) and renders the
+  # ANSI dim (--ansi); we parse the name back out by cutting at the tab.
   # Portable basename listing: GNU find's -printf '%f' is unavailable on
   # macOS/BSD find, so strip the leading path with sed instead.
-  selected_name="$({
+  selected_line="$({
     if [[ -d "$_WT_MAIN_REPO" ]]; then
-      printf '%s\n' 'main'
+      printf '%s\t%s%s%s\n' 'main' "$dim" "$(_wt_branch_of "$_WT_MAIN_REPO")" "$reset"
     fi
-    find "$_WT_WORKTREES_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's:.*/::'
-  } | sort | fzf --prompt='worktree> ' --height=40% --reverse)"
+    find "$_WT_WORKTREES_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's:.*/::' | while IFS= read -r _wt_name; do
+      printf '%s\t%s%s%s\n' "$_wt_name" "$dim" "$(_wt_branch_of "$_WT_WORKTREES_DIR/$_wt_name")" "$reset"
+    done
+  } | sort | fzf --ansi --delimiter=$'\t' --nth=1 --prompt='worktree> ' --height=40% --reverse)"
 
-  if [[ -z "$selected_name" ]]; then
+  if [[ -z "$selected_line" ]]; then
     return 1
   fi
+
+  # Keep the first match, then take the name (everything before the tab).
+  selected_line="${selected_line%%$'\n'*}"
+  selected_name="${selected_line%%$'\t'*}"
 
   if [[ "$selected_name" == 'main' ]]; then
     selected_path="$_WT_MAIN_REPO"

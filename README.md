@@ -16,8 +16,11 @@ It assumes the worktree layout where a repo's worktrees live in a sibling
 ```
 
 Run `wt` from anywhere inside the repo (or any of its worktrees) and pick from a
-fuzzy list that includes `main` plus every worktree. Run `wt add <name>` to
-create `myrepo.worktrees/<name>` on a branch named `<name>` and drop into it.
+fuzzy list that includes `main` plus every worktree. Each entry shows the branch
+currently checked out in that worktree in faded text (a detached HEAD shows as
+`detached@<sha>`); the fuzzy search matches on the worktree name. Run
+`wt add <name>` to create `myrepo.worktrees/<name>` on a branch named `<name>`
+and drop into it.
 
 The main checkout is found via `git worktree list` (its first entry is always
 the primary worktree), so `wt` works correctly even when invoked from inside a
@@ -58,6 +61,21 @@ Then restart your shell (or `source` the printed path). The installer:
 - copies `wt.sh` to `~/.local/share/wt/wt.sh` (respects `$XDG_DATA_HOME`)
 - adds a source line to `~/.bashrc` and/or `~/.zshrc` (whichever exist)
 - is idempotent — safe to re-run
+
+## Update
+
+Re-running the installer is safe and overwrites `wt.sh` in place. To do a
+**clean** update — removing the old function file and rc source lines first,
+then reinstalling fresh (useful if the install layout or rc wiring changed) —
+pass `--update`:
+
+```sh
+# from a clone
+./install.sh --update
+
+# remote one-liner
+curl -fsSL https://raw.githubusercontent.com/icecat2005/wt/main/install.sh | sh -s -- --update
+```
 
 > **macOS bash note:** login shells read `~/.bash_profile`, not `~/.bashrc`. If
 > you use bash on macOS and `wt` isn't found in a new terminal, add
